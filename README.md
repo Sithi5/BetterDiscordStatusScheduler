@@ -25,9 +25,6 @@ StatusScheduler is a plugin for setting custom statuses based on the time of day
 
 This plugin was created by Sithi5.
 
-Version
-1.0.0
-
 ## Contributing
 
 Feel free to contribute ! Simply fork the repository, create a new branch, and submit a pull request when you're ready.
