@@ -6,6 +6,9 @@
  * @source https://github.com/Sithi5/BetterDiscordStatusScheduler
  */
 
+INTERVAL_SECONDS = 60;
+INTERVAL_TIME = 1000 * INTERVAL_SECONDS;
+
 const UserSettingsProtoUtils = BdApi.Webpack.getModule(
   (m) => {
     return (
@@ -25,13 +28,24 @@ const daysList = [
   'Sunday',
 ];
 
+const statusTypes = ['dnd', 'online', 'invisible', 'idle'];
+
+const defaultStatus = {
+  start: '09:00',
+  end: '18:00',
+  days: [0, 1, 2, 3, 4],
+  status: 'dnd',
+  customStatus: 'Working',
+  emojiName: '',
+};
+
 const defaultStatusConfig = {
   working: {
     start: '09:00',
     end: '18:00',
     days: [0, 1, 2, 3, 4],
     status: 'dnd',
-    customText: 'Working',
+    customStatus: 'Working',
     emojiName: '',
   },
   onlineWeekdays: {
@@ -39,31 +53,31 @@ const defaultStatusConfig = {
     end: '23:00',
     days: [0, 1, 2, 3, 4],
     status: 'online',
-    customText: 'Online',
+    customStatus: 'Online',
     emojiName: '',
   },
   onlineWeekend: {
     start: '09:00',
     end: '23:00',
     days: [5, 6],
-    status: 'online',
-    customText: 'Online',
-    emojiName: '',
+    status: 'Online',
+    customStatus: 'Weekend',
+    emojiName: '😎',
   },
   invisible: {
     start: '00:00',
     end: '09:00',
     days: [0, 1, 2, 3, 4, 5, 6],
     status: 'invisible',
-    customText: 'Offline',
+    customStatus: 'Offline',
     emojiName: '',
   },
   idleEvening: {
     start: '23:00',
-    end: '24:00',
+    end: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
     status: 'idle',
-    customText: 'Idle',
+    customStatus: 'Idle',
     emojiName: '',
   },
 };
@@ -76,16 +90,24 @@ module.exports = (meta) => ({
   /**
    * Updates the remote status to the param `toStatus`
    * @param {('online'|'idle'|'invisible'|'dnd')} toStatus
-   * @param {string} customText
+   * @param {string} customStatus
    * @param {string} emojiName
    */
-  updateStatus(toStatus, customText = '', emojiName = '') {
-    console.log('Updating status to', toStatus);
+  updateStatus(toStatus, customStatus = '', emojiName = '') {
+    console.log('Updating status...');
+
     UserSettingsProtoUtils.updateAsync(
       'status',
       (statusSetting) => {
+        console.log('Old status:', statusSetting.status.value);
+        console.log('Old Custom status:', statusSetting.customStatus.text);
+        console.log('Old Emoji name:', statusSetting.customStatus.emojiName);
+        console.log('---------------------');
+        console.log('New status:', toStatus);
+        console.log('New Custom status:', customStatus);
+        console.log('New Emoji name:', emojiName);
         statusSetting.status.value = toStatus;
-        statusSetting.customStatus.text = customText;
+        statusSetting.customStatus.text = customStatus;
         statusSetting.customStatus.emojiName = emojiName;
       },
       0
@@ -104,7 +126,7 @@ module.exports = (meta) => ({
     const currentTime = `${now.getHours()}:${now.getMinutes()}`;
     let statusToUpdate = null;
     for (const key in statusConfig) {
-      const { start, end, days, status, customText, emojiName } =
+      const { start, end, days, status, customStatus, emojiName } =
         statusConfig[key];
       if (
         currentTime >= start &&
@@ -112,39 +134,14 @@ module.exports = (meta) => ({
         days.includes(currentDay)
       ) {
         statusToUpdate = status;
-        this.updateStatus(status, customText, emojiName);
+        this.updateStatus(status, customStatus, emojiName);
         break;
       }
     }
 
     if (!statusToUpdate) {
       // Default to 'online' if no matching status config found
-      this.updateStatus('online');
-    }
-  },
-
-  /**
-   * Sets the status to 'dnd' if the current second is even, otherwise sets it to 'online'
-   * Used for testing
-   * @private
-   * @memberof StatusScheduler
-   * @returns {void}
-   **/
-  setStatusForTesting() {
-    const now = new Date();
-    const currentSec = now.getSeconds();
-    if (currentSec % 2 === 0) {
-      this.updateStatus(
-        statusConfig.working.status,
-        statusConfig.working.customText,
-        statusConfig.working.emojiName
-      );
-    } else {
-      this.updateStatus(
-        statusConfig.onlineWeekdays.status,
-        statusConfig.onlineWeekdays.customText,
-        statusConfig.onlineWeekdays.emojiName
-      );
+      this.updateStatus('idle', '', '');
     }
   },
 
@@ -153,7 +150,7 @@ module.exports = (meta) => ({
     this.intervalId = setInterval(() => {
       console.log('Checking status...');
       this.setStatusFromDate();
-    }, 60000);
+    }, INTERVAL_TIME);
   },
 
   stop() {
@@ -161,124 +158,220 @@ module.exports = (meta) => ({
     clearInterval(this.intervalId);
   },
 
-  resetSettings() {
+  resetSettingsHandler() {
     statusConfig = JSON.parse(JSON.stringify(defaultStatusConfig));
-    for (const key in statusConfig) {
-      const { start, end, days } = statusConfig[key];
+    this.updateSettingsPanel();
+  },
 
-      const startTimeInput = document.querySelector(
-        `input[name="${key}-start-time"]`
-      );
-      startTimeInput.value = start;
-
-      const endTimeInput = document.querySelector(
-        `input[name="${key}-end-time"]`
-      );
-      endTimeInput.value = end;
-
-      daysList.forEach((day, index) => {
-        const dayRadio = document.querySelector(
-          `input[name="${key}-day-${index}"]`
-        );
-        dayRadio.checked = days.includes(index);
-      });
+  removeConfigButtonClickHandler(event) {
+    if (event.target.classList.contains('remove-config-button')) {
+      const key = event.target.dataset.key;
+      const configSetting = document.getElementById(`status-scheduler-${key}`);
+      configSetting.remove();
+      delete statusConfig[key];
     }
   },
 
-  getSettingsPanel() {
-    // TODO: Improve a lot here, better styling, test if functional etc
-    const settingsPanel = document.createElement('div');
-
-    settingsPanel.id = 'status-scheduler-settings';
-    settingsPanel.style.color = 'white';
+  updateSettingsPanel() {
+    this.settingsPanel.innerHTML = '';
 
     // Add the style tag with the required CSS
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-    .day-wrapper {
-      display: inline-block;
-      margin-right: 10px;
+    .row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
     }
-    `;
-    settingsPanel.appendChild(styleTag);
-
-    // Reset config button
-    const resetButton = document.createElement('button');
-    resetButton.textContent = 'Reset to Default';
-    resetButton.style.marginTop = '1rem';
-    resetButton.addEventListener('click', () => {
-      this.resetSettings();
-    });
-    settingsPanel.appendChild(resetButton);
+    .config-container {
+      display: flex;
+    }
+    .inline-element {
+      margin-right: 1rem;
+    }
+    .center {
+      justify-content: center;
+    }
+    .bold {
+      font-weight: bold;
+    }
+  `;
+    this.settingsPanel.appendChild(styleTag);
 
     for (const key in statusConfig) {
-      const { start, end, days, status, customText, emojiName } =
+      const { start, end, days, status, customStatus, emojiName } =
         statusConfig[key];
 
-      const configSetting = document.createElement('div');
-      configSetting.id = `status-scheduler-${key}`;
-      configSetting.className = 'status-scheduler-config';
+      const keyContainer = document.createElement('div');
+      keyContainer.className = 'row center';
+      keyContainer.style.paddingTop = '1rem';
+      this.settingsPanel.appendChild(keyContainer);
 
-      const keyLabel = document.createElement('span');
-      keyLabel.textContent = `${key}: `;
-      keyLabel.style.fontWeight = 'bold';
-      configSetting.appendChild(keyLabel);
+      const keyName = document.createElement('span');
+      keyName.textContent = `${key}: `;
+      keyName.className = 'bold';
+      keyContainer.appendChild(keyName);
 
-      const startTimeLabel = document.createElement('span');
-      startTimeLabel.textContent = `Start time: `;
-      configSetting.appendChild(startTimeLabel);
+      const configContainer = document.createElement('div');
+      configContainer.className = 'row config-container';
+      this.settingsPanel.appendChild(configContainer);
 
       const startTimeInput = document.createElement('input');
       startTimeInput.type = 'time';
       startTimeInput.name = `${key}-start-time`;
       startTimeInput.value = start;
-      configSetting.appendChild(startTimeInput);
-
-      const endTimeLabel = document.createElement('span');
-      endTimeLabel.textContent = `End time: `;
-      configSetting.appendChild(endTimeLabel);
+      startTimeInput.addEventListener('change', (event) => {
+        statusConfig[key].start = event.target.value;
+      });
+      configContainer.appendChild(startTimeInput);
 
       const endTimeInput = document.createElement('input');
       endTimeInput.type = 'time';
       endTimeInput.name = `${key}-end-time`;
       endTimeInput.value = end;
-      configSetting.appendChild(endTimeInput);
+      endTimeInput.addEventListener('change', (event) => {
+        statusConfig[key].end = event.target.value;
+      });
+      configContainer.appendChild(endTimeInput);
 
-      const daysWrapper = document.createElement('div');
-      daysWrapper.className = 'days-wrapper';
+      const customStatusInput = document.createElement('input');
+      customStatusInput.type = 'text';
+      customStatusInput.name = `${key}-custom-text`;
+      customStatusInput.value = customStatus;
+      customStatusInput.placeholder = 'Custom status';
+      customStatusInput.addEventListener('input', (event) => {
+        statusConfig[key].customStatus = event.target.value;
+      });
+      configContainer.appendChild(customStatusInput);
+
+      const emojiInput = document.createElement('input');
+      emojiInput.type = 'text';
+      emojiInput.inputMode = 'emoji';
+      emojiInput.name = `${key}-emoji-name`;
+      emojiInput.value = emojiName;
+      emojiInput.placeholder = 'Emoji input';
+      emojiInput.addEventListener('input', (event) => {
+        statusConfig[key].emojiName = event.target.value;
+      });
+      configContainer.appendChild(emojiInput);
+
+      const statusDropdown = document.createElement('select');
+      statusDropdown.name = `${key}-status-dropdown`;
+      statusDropdown.className = 'status-dropdown';
+
+      statusTypes.forEach((statusType) => {
+        const option = document.createElement('option');
+        option.value = statusType;
+        option.textContent = statusType;
+        if (statusType === status) {
+          option.setAttribute('selected', 'selected');
+        }
+        statusDropdown.appendChild(option);
+      });
+      statusDropdown.addEventListener('change', (event) => {
+        statusConfig[key].status = event.target.value;
+      });
+      configContainer.appendChild(statusDropdown);
+
+      const daysContainerWrapper = document.createElement('div');
+      daysContainerWrapper.className = 'row';
+      this.settingsPanel.appendChild(daysContainerWrapper);
+
+      const daysContainer = document.createElement('div');
+      daysContainer.className = 'inline-element';
+      daysContainerWrapper.appendChild(daysContainer);
+
       daysList.forEach((day, index) => {
-        const dayWrapper = document.createElement('div');
-        dayWrapper.className = 'day-wrapper';
-
-        const dayRadio = document.createElement('input');
-        dayRadio.type = 'checkbox';
-        dayRadio.name = `${key}-day-${index}`;
-        dayRadio.value = index;
-        dayRadio.checked = days.includes(index);
-        dayRadio.className = 'day-radio';
-        dayWrapper.appendChild(dayRadio);
-
         const dayLabel = document.createElement('label');
-        dayLabel.htmlFor = `${key}-day-${index}`;
         dayLabel.textContent = day;
-        dayWrapper.appendChild(dayLabel);
+        dayLabel.className = 'day-label';
 
-        daysWrapper.appendChild(dayWrapper);
+        const dayInput = document.createElement('input');
+        dayInput.type = 'checkbox';
+        dayInput.name = `${key}-days-${index}`;
+        dayInput.value = index;
+        dayInput.className = 'day-checkbox';
+
+        if (days.includes(index)) {
+          dayInput.setAttribute('checked', 'checked');
+        }
+
+        dayInput.addEventListener('change', (event) => {
+          if (event.target.checked) {
+            if (!statusConfig[key].days.includes(index)) {
+              statusConfig[key].days.push(index);
+            }
+          } else {
+            statusConfig[key].days = statusConfig[key].days.filter(
+              (dayIndex) => dayIndex !== index
+            );
+          }
+        });
+        daysContainer.appendChild(dayInput);
+        daysContainer.appendChild(dayLabel);
       });
-
-      configSetting.appendChild(daysWrapper);
-
-      const removeButton = document.createElement('button');
-      removeButton.innerHTML = '&#10006;';
-      removeButton.className = 'remove-config-button';
-      removeButton.addEventListener('click', () => {
-        settingsPanel.removeChild(configSetting);
+      const deleteConfigButton = document.createElement('button');
+      deleteConfigButton.innerHTML = '&#10006;';
+      deleteConfigButton.className = 'delete-config-button';
+      deleteConfigButton.addEventListener('click', () => {
         delete statusConfig[key];
+        this.updateSettingsPanel();
       });
-      configSetting.appendChild(removeButton);
-
-      settingsPanel.append(configSetting);
+      configContainer.appendChild(deleteConfigButton);
     }
-    return settingsPanel;
+
+    const addConfigInputName = document.createElement('input');
+    addConfigInputName.type = 'text';
+    addConfigInputName.placeholder = 'Enter new configuration name';
+    this.settingsPanel.appendChild(addConfigInputName);
+
+    const addConfigButton = document.createElement('button');
+    addConfigButton.textContent = 'Add Row';
+    addConfigButton.addEventListener('click', () => {
+      const configName = addConfigInputName.value;
+      if (
+        !configName ||
+        configName === '' ||
+        statusConfig[configName] !== undefined
+      ) {
+        console.log('Empty or invalid config name');
+        return;
+      }
+      statusConfig[configName] = { ...defaultStatus };
+      this.updateSettingsPanel();
+    });
+    this.settingsPanel.appendChild(addConfigButton);
+    // Reset config button
+    const resetSettingContainer = document.createElement('div');
+    resetSettingContainer.className = 'row center';
+    this.settingsPanel.appendChild(resetSettingContainer);
+
+    const resetSettingsButton = document.createElement('button');
+    resetSettingsButton.textContent = 'Reset to Default';
+    resetSettingsButton.addEventListener('click', () => {
+      this.resetSettingsHandler();
+    });
+    resetSettingContainer.appendChild(resetSettingsButton);
+  },
+
+  updateStatusConfig(key, field, value) {
+    console.log('updateStatusConfig', key, field, value);
+    statusConfig[key][field] = value;
+    this.updateSettingsPanel();
+  },
+
+  getSettingsPanel() {
+    this.settingsPanel = document.createElement('div');
+    this.settingsPanel.id = 'status-scheduler-settings';
+    this.settingsPanel.style.color = 'white';
+
+    this.updateSettingsPanel();
+
+    this.settingsPanel.addEventListener(
+      'click',
+      this.removeConfigButtonClickHandler
+    );
+
+    return this.settingsPanel;
   },
 });
