@@ -144,8 +144,8 @@ module.exports = (meta) => ({
     this.setStatusFromDate();
     this.intervalId = setInterval(() => {
       console.log('Checking status...');
-      this.setStatusForTesting();
-    }, 5000);
+      this.setStatusFromDate();
+    }, 60000);
   },
 
   stop() {
