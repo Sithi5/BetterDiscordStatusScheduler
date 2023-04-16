@@ -106,9 +106,16 @@ module.exports = (meta) => ({
         console.log('New status:', toStatus);
         console.log('New Custom status:', customStatus);
         console.log('New Emoji name:', emojiName);
-        if (statusSetting?.customStatus) {
-          statusSetting.customStatus.text = customStatus;
-          statusSetting.customStatus.emojiName = emojiName;
+        if (customStatus != '' || emojiName != '') {
+          if (statusSetting?.customStatus) {
+            statusSetting.customStatus.text = customStatus;
+            statusSetting.customStatus.emojiName = emojiName;
+          } else {
+            statusSetting.customStatus = {
+              text: customStatus,
+              emojiName: emojiName,
+            };
+          }
         }
         statusSetting.status.value = toStatus;
       },
