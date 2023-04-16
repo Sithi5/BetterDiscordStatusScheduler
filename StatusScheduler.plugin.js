@@ -50,9 +50,17 @@ const defaultStatusConfig = {
     customText: 'Online',
     emojiName: '',
   },
-  idle: {
-    start: '23:00',
+  invisible: {
+    start: '00:00',
     end: '09:00',
+    days: [0, 1, 2, 3, 4, 5, 6],
+    status: 'invisible',
+    customText: 'Offline',
+    emojiName: '',
+  },
+  idleEvening: {
+    start: '23:00',
+    end: '24:00',
     days: [0, 1, 2, 3, 4, 5, 6],
     status: 'idle',
     customText: 'Idle',
