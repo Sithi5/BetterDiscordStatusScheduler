@@ -60,7 +60,7 @@ const defaultStatusConfig = {
     start: '09:00',
     end: '23:00',
     days: [5, 6],
-    status: 'Online',
+    status: 'online',
     customStatus: 'Weekend',
     emojiName: '😎',
   },
