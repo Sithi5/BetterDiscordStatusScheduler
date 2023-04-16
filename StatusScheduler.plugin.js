@@ -2,7 +2,7 @@
  * @name StatusScheduler
  * @author Sithi5
  * @description Set a custom status based on the time of day
- * @version 1.0.0
+ * @version 1.0.1
  * @source https://github.com/Sithi5/BetterDiscordStatusScheduler
  */
 
@@ -99,16 +99,18 @@ module.exports = (meta) => ({
     UserSettingsProtoUtils.updateAsync(
       'status',
       (statusSetting) => {
-        console.log('Old status:', statusSetting.status.value);
-        console.log('Old Custom status:', statusSetting.customStatus.text);
-        console.log('Old Emoji name:', statusSetting.customStatus.emojiName);
+        console.log('Old status:', statusSetting?.status?.value);
+        console.log('Old Custom status:', statusSetting?.customStatus?.text);
+        console.log('Old Emoji name:', statusSetting?.customStatus?.emojiName);
         console.log('---------------------');
         console.log('New status:', toStatus);
         console.log('New Custom status:', customStatus);
         console.log('New Emoji name:', emojiName);
+        if (statusSetting?.customStatus) {
+          statusSetting.customStatus.text = customStatus;
+          statusSetting.customStatus.emojiName = emojiName;
+        }
         statusSetting.status.value = toStatus;
-        statusSetting.customStatus.text = customStatus;
-        statusSetting.customStatus.emojiName = emojiName;
       },
       0
     );
@@ -124,15 +126,21 @@ module.exports = (meta) => ({
     const now = new Date();
     const currentDay = (now.getDay() + 6) % 7; // Adjust current day to start from Monday (0)
     const currentTime = `${now.getHours()}:${now.getMinutes()}`;
+
     let statusToUpdate = null;
     for (const key in statusConfig) {
       const { start, end, days, status, customStatus, emojiName } =
         statusConfig[key];
-      if (
-        currentTime >= start &&
-        currentTime <= end &&
-        days.includes(currentDay)
-      ) {
+      const [startHours, startMinutes] = start.split(':');
+      const [endHours, endMinutes] = end.split(':');
+      const startDate = new Date();
+      const endDate = new Date();
+      startDate.setHours(startHours, startMinutes, 0, 0);
+      endDate.setHours(endHours, endMinutes, 0, 0);
+      if (now >= startDate && now <= endDate && days.includes(currentDay)) {
+        console.log('currentTime', currentTime);
+        console.log('start', start);
+        console.log('end', end);
         statusToUpdate = status;
         this.updateStatus(status, customStatus, emojiName);
         break;
