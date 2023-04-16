@@ -2,7 +2,7 @@
  * @name StatusScheduler
  * @author Sithi5
  * @description Set a custom status based on the time of day
- * @version 1.0.1
+ * @version 1.0.2
  * @source https://github.com/Sithi5/BetterDiscordStatusScheduler
  */
 
