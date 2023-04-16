@@ -1,0 +1,1 @@
+/Users/sithis/Library/Application Support/BetterDiscord/plugins/StatusScheduler.plugin.js
